@@ -1,183 +1,113 @@
 # Scroll 🧭
 
-> Navigate ChatGPT, Claude & Gemini conversations without endless scrolling
+> **Navigate ChatGPT, Claude & Gemini conversations without endless scrolling.**
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.2.0-green.svg)
+<p align="center">
+  <img src="assets/hero.png" alt="Scroll Extension Hero" width="100%">
+</p>
 
-## The Problem
+<p align="center">
+  <a href="https://chrome.google.com/webstore/detail/dkpaimhimabaanniclfbpocbhfjmlaml">
+    <img src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-gray?logo=google-chrome&logoColor=white" alt="Chrome Web Store">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/Firefox_Add--ons-Coming_Soon-gray?logo=firefox-browser&logoColor=white" alt="Firefox Add-ons">
+  </a>
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/version-1.2.0-green.svg" alt="Version">
+</p>
 
-AI chat interfaces weren't designed for knowledge work. When you're deep in a long conversation with ChatGPT, Claude, or Gemini, finding that brilliant response from 20 minutes ago means scrolling... and scrolling... and hoping you remember where it was.
+## ⚡️ The Solution
 
-## The Solution
+AI chat interfaces weren't designed for long conversations. Finding a specific prompt from 20 minutes ago requires endless scrolling.
 
-Scroll adds a floating navigation panel to AI chat interfaces. Jump to any prompt or response instantly. Navigate by headings. Never lose your place again.
+**Scroll** adds a native navigation sidebar to your chats. It auto-generates a table of contents based on your prompts and headers, letting you jump instantly to what matters.
 
-## Features
+<p align="center">
+  <img src="assets/demo.gif" alt="Scroll Demo" width="100%">
+</p>
 
-- **One-Click Navigation** - Jump to any turn in the conversation instantly
-- **Heading Navigation** - Navigate long AI responses by their headings
-- **Adaptive UI** - Seamlessly matches each platform's design language
-- **Keyboard Shortcuts** - Navigate without touching your mouse
-- **Search & Filter** - Find specific conversations or responses
-- **Progress Tracking** - Always know where you are in long threads
-- **View Modes** - Toggle between all messages or prompts only
-- **Universal** - Works on ChatGPT, Claude, and Gemini (so far)
+## ✨ Features
 
-## Installation
+<p align="center">
+  <img src="assets/features.png" alt="Features Overview" width="100%">
+</p>
 
-### From Chrome Web Store (Coming Soon)
-[Link will be added once published]
+- **One-Click Navigation:** Jump to any turn in the conversation instantly.
+- **Heading Support:** Automatically detects headings (`#`, `##`) inside long AI responses.
+- **Search & Filter:** Type to find that one specific code snippet or idea.
+- **Privacy Focused:** Runs 100% locally. No data leaves your browser.
+- **Keyboard Shortcuts:** Keep your hands on the keyboard (`Cmd/Ctrl + .` to toggle).
 
-### From Firefox Add-ons (Coming Soon)
-[Link will be added once published]
+## 📥 Installation
 
-### From Source
+### Option 1: Web Stores (Recommended)
+* **Chrome / Brave / Edge:** [Download from Chrome Web Store](LINK_HERE) *(Pending Review)*
+* **Firefox:** [Download from Firefox Add-ons](LINK_HERE) *(Coming Soon)*
 
-First clone this repository:
-```bash
-git clone https://github.com/asker-kurtelli/scroll.git
-cd scroll
-```
+### Option 2: Manual Install (From Source)
+If you want the latest version immediately, you can install it manually.
 
-#### Chrome/Chromium/Edge/Brave
+**1. Get the Code**
+* **Method A (No Git):** [Click here to Download ZIP](https://github.com/asker-kurtelli/scroll/archive/refs/heads/main.zip), then unzip the folder.
+* **Method B (Git):**
+  ```bash
+  git clone [https://github.com/asker-kurtelli/scroll.git](https://github.com/asker-kurtelli/scroll.git)
+````
 
-1. Open Chrome and navigate to `chrome://extensions`
-2. Enable **Developer Mode** (toggle in top-right corner)
-3. Click **Load unpacked** and select the `scroll` folder
-4. Navigate to [ChatGPT](https://chatgpt.com), [Claude](https://claude.ai), or [Gemini](https://gemini.google.com)
-5. Look for the Scroll button on the right side of your screen!
+**2. Install in Browser**
 
-#### Firefox
+| Chrome / Edge / Brave | Firefox |
+|:---|:---|
+| 1. Go to `chrome://extensions` <br> 2. Toggle **Developer Mode** (top right) <br> 3. Click **Load Unpacked** <br> 4. Select the `scroll` folder | 1. Go to `about:debugging#/runtime/this-firefox` <br> 2. Click **Load Temporary Add-on** <br> 3. Select the `manifest.json` file inside the `scroll` folder <br> *Note: Firefox removes temporary extensions when you restart the browser.* |
 
-1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`
-2. Click **Load Temporary Add-on**
-3. Navigate to the `scroll` folder and select the `manifest.json` file
-4. Navigate to [ChatGPT](https://chatgpt.com), [Claude](https://claude.ai), or [Gemini](https://gemini.google.com)
-5. Look for the Scroll button on the right side of your screen!
+## ⌨️ Shortcuts
 
-**Note:** Temporary add-ons in Firefox are removed when you close the browser. For permanent installation, you can either install from Firefox Add-ons (when published) or sign the extension yourself.
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl` + `.` | Toggle Panel |
+| `j` / `k` | Navigate Down/Up |
+| `Enter` | Jump to Message |
+| `Esc` | Close Panel |
+| `←` / `→` | Toggle View (Prompts/All) |
 
-## Usage
+## 🗺️ Roadmap
 
-### Basic Navigation
+  - [x] Basic navigation & Search
+  - [x] Heading navigation (Markdown support)
+  - [x] Firefox support (Manifest V3)
+  - [ ] Pin favorite responses
+  - [ ] Export conversations
+  - [ ] Custom themes
+  - [ ] Conversation bookmarks
 
-- **Open/Close**: Click the Scroll button or press `Cmd+;` (Mac) / `Ctrl+;` (Windows/Linux)
-- **Jump to Message**: Click any item in the navigation panel
-- **Navigate by Keyboard**:
-  - `↓` or `j` - Move down
-  - `↑` or `k` - Move up
-  - `Enter` - Jump to selected item
-  - `←` - Switch to "Prompts Only" view
-  - `→` - Switch to "All" view
-  - `Esc` - Close panel
+## 🔒 Privacy
 
-### Advanced Features
+Scroll is open source and privacy-first.
 
-- **Search**: Type in the search box to filter messages
-- **Copy Text**: Right-click any navigation item to copy its content
-- **View Modes**: Toggle between "Prompts" (user messages only) or "All" (including AI responses)
-- **Progress Indicator**: See how far you've scrolled through the conversation
+  - **No Tracking:** We do not collect user analytics.
+  - **No Data Transmission:** Chat content never leaves your browser.
+  - **Local Only:** All processing happens inside `content.js`.
 
-## Keyboard Shortcuts
+## 🤝 Contributing
 
-| Shortcut       | Action                  |
-|----------------|-------------------------|
-| `Cmd/Ctrl + ;` | Toggle navigation panel |
-| `↓` or `j`     | Navigate down           |
-| `↑` or `k`     | Navigate up             |
-| `Enter`        | Jump to selected item   |
-| `←`            | Prompts only view       |
-| `→`            | All messages view       |
-| `Esc`          | Close panel             |
+Contributions are welcome\!
 
-## Privacy
+1.  Fork the repo.
+2.  Create a branch (`git checkout -b feature/amazing-feature`).
+3.  Make changes (Codebase is Vanilla JS, no build steps required).
+4.  Submit a PR.
 
-Scroll runs **entirely in your browser**. No data is collected, stored, or transmitted anywhere. The extension only reads page content to build the navigation panel.
+See [CONTRIBUTING.md](https://www.google.com/search?q=CONTRIBUTING.md) for detailed guidelines.
 
-[View the source code](https://github.com/asker-kurtelli/scroll) - it's all here.
+## 📜 License
 
-## Roadmap
+MIT License - Free and Open Source forever.
 
-- [x] Basic navigation
-- [x] Keyboard shortcuts
-- [x] Search and filter
-- [x] Heading navigation
-- [x] Firefox support
-- [ ] Pin favorite responses
-- [ ] Export conversations
-- [ ] Custom themes
-- [ ] Markdown export
-- [ ] Conversation bookmarks
+-----
 
-Have an idea? [Open an issue](https://github.com/asker-kurtelli/scroll/issues)!
-
-## Contributing
-
-Contributions are welcome! Whether it's:
-
-- 🐛 Bug reports
-- 💡 Feature requests
-- 📖 Documentation improvements
-- 🔧 Code contributions
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Setup
-
-1. Fork and clone the repository
-2. Make your changes
-3. Test on ChatGPT, Claude, and Gemini
-4. Submit a pull request
-
-The codebase is vanilla JavaScript - no build step required!
-
-## Built With
-
-- Vanilla JavaScript (no frameworks)
-- CSS3 with backdrop-filter for glass effects
-- Chrome Extension Manifest V3
-- MutationObserver for real-time updates
-
-## Why Open Source?
-
-I believe AI tools should work better for serious work. Open sourcing Scroll means:
-
-- **Transparency** - You can see exactly what the extension does
-- **Community** - Faster iteration with feedback and contributions
-- **Trust** - No black boxes, no data collection
-- **Learning** - Others can learn from and build on these ideas
-
-## Browser Support
-
-- ✅ Chrome/Chromium (tested)
-- ✅ Firefox (supported)
-- ⏳ Edge (needs testing)
-- ⏳ Brave (needs testing)
-- ⏳ Safari (investigating)
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-Built with frustration (from scrolling) and curiosity (about better UX for AI tools).
-
-Inspired by everyone who's ever lost a great AI response in a long conversation.
-
-## Support
-
-- 🐛 [Report a bug](https://github.com/yourusername/scroll/issues)
-- 💡 [Request a feature](https://github.com/yourusername/scroll/issues)
-- 💬 [Discussions](https://github.com/yourusername/scroll/discussions)
-
-## Author
-
-Built by [Asker Kurt-Elli](https://x.com/askerkurtelli)
-
-Building tools to make AI better for knowledge work. Follow along for more experiments.
-
----
-
-**If Scroll saved you some scrolling, give it a ⭐️ on GitHub!**
+\<p align="center"\>
+Built by \<a href="https://x.com/askerkurtelli"\>Asker Kurt-Elli\</a\>
+<br>
+\<i\>If Scroll saves you time, give it a ⭐️ on GitHub\!\</i\>
+\</p\>
