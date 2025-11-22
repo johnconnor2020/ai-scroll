@@ -51,9 +51,9 @@ If you want the latest version immediately, you can install it manually.
 **1. Get the Code**
 * **Method A (No Git):** [Click here to Download ZIP](https://github.com/asker-kurtelli/scroll/archive/refs/heads/main.zip), then unzip the folder.
 * **Method B (Git):**
-  ```bash
-  git clone [https://github.com/asker-kurtelli/scroll.git](https://github.com/asker-kurtelli/scroll.git)
-````
+``
+  git clone https://github.com/asker-kurtelli/scroll.git
+  ``
 
 **2. Install in Browser**
 
@@ -65,8 +65,8 @@ If you want the latest version immediately, you can install it manually.
 
 | Shortcut | Action |
 |----------|--------|
-| `Cmd/Ctrl` + `.` | Toggle Panel |
-| `j` / `k` | Navigate Down/Up |
+| `Cmd/Ctrl` + `.` or `;` | Toggle Panel |
+| `↑` / `↓` or `j` / `k` | Navigate Down/Up |
 | `Enter` | Jump to Message |
 | `Esc` | Close Panel |
 | `←` / `→` | Toggle View (Prompts/All) |
@@ -98,7 +98,7 @@ Contributions are welcome\!
 3.  Make changes (Codebase is Vanilla JS, no build steps required).
 4.  Submit a PR.
 
-See [CONTRIBUTING.md](https://www.google.com/search?q=CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](https://github.com/asker-kurtelli/scroll/blob/main/contributing.md) for detailed guidelines.
 
 ## 📜 License
 
@@ -106,8 +106,8 @@ MIT License - Free and Open Source forever.
 
 -----
 
-\<p align="center"\>
-Built by \<a href="https://x.com/askerkurtelli"\>Asker Kurt-Elli\</a\>
+<p align="center"\>
+Built by <a href="https://x.com/askerkurtelli">Asker Kurt-Elli</a>
 <br>
-\<i\>If Scroll saves you time, give it a ⭐️ on GitHub\!\</i\>
-\</p\>
+<i>If Scroll saves you time, give it a ⭐️ on GitHub!</i>
+</p>
