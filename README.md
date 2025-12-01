@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <a href="https://chrome.google.com/webstore/detail/dkpaimhimabaanniclfbpocbhfjmlaml">
-    <img src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-gray?logo=google-chrome&logoColor=white" alt="Chrome Web Store">
+  <a href="https://chromewebstore.google.com/detail/scroll/mpcklmodkihbiblhffoganikkdfoaphe">
+    <img src="https://img.shields.io/badge/Chrome_Web_Store-Install_Now-brightgreen?logo=google-chrome&logoColor=white" alt="Chrome Web Store">
   </a>
   <a href="#">
     <img src="https://img.shields.io/badge/Firefox_Add--ons-Coming_Soon-gray?logo=firefox-browser&logoColor=white" alt="Firefox Add-ons">
