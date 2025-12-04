@@ -77,7 +77,16 @@
       getSendButton: () => document.querySelector('button[data-testid="send-button"]'),
       setInputValue: (el, text) => {
         el.focus();
-        el.value = text;
+        // ChatGPT uses contenteditable for the input, not a regular textarea
+        // Note: execCommand is deprecated but still works well for contenteditable
+        // and matches the pattern used by the Claude provider
+        if (el.isContentEditable) {
+          el.innerHTML = '';
+          document.execCommand('insertText', false, text);
+        } else {
+          // Fallback for regular input/textarea
+          el.value = text;
+        }
         el.dispatchEvent(new Event('input', { bubbles: true }));
       },
       getTurns: (container) => {
@@ -1048,13 +1057,25 @@
       if (sendBtnNow) {
         sendBtnNow.click();
 
-        // Remove from queue immediately after sending
+        // Remove from queue after clicking send
         state.messageQueue = state.messageQueue.filter(m => m.id !== msg.id);
         saveQueueForChat();
         renderQueue();
         updateQueueStatus();
+
+        // Wait a bit for ChatGPT to start processing before releasing the lock
+        // This prevents race conditions where the next message tries to send
+        // before ChatGPT has started "thinking" (1000ms allows UI to update)
+        setTimeout(() => {
+          state.queueProcessing = false;
+          // If AI didn't start thinking (empty input or other issue), try to continue queue
+          if (!state.isAiThinking && state.messageQueue.some(m => m.status === 'pending')) {
+            processQueue();
+          }
+        }, 1000);
+      } else {
+        state.queueProcessing = false;
       }
-      state.queueProcessing = false;
     }, 300);
   }
 
