@@ -70,8 +70,12 @@
       inputSelector: '#prompt-textarea, [contenteditable="true"][data-placeholder]',
       sendButtonSelector: 'button[data-testid="send-button"], button[data-testid="stop-button"]',
       isThinking: () => {
+        // Check for stop button (primary indicator)
         const stopBtn = document.querySelector('button[data-testid="stop-button"]');
-        return stopBtn !== null;
+        if (stopBtn) return true;
+        // Also check for streaming indicator or loading states
+        const streamingIndicator = document.querySelector('[data-testid="stop-button"], .result-streaming, [class*="streaming"]');
+        return streamingIndicator !== null;
       },
       getInputElement: () => {
         // ChatGPT may use different input elements depending on UI version
@@ -196,6 +200,7 @@
     isAiThinking: false,        // Is AI currently generating?
     queueEnabled: true,         // Feature toggle
     thinkingObserver: null,     // MutationObserver for button state
+    thinkingPollInterval: null, // Backup polling interval for thinking state
     queueProcessing: false,     // Prevent concurrent processing
     currentChatId: null,        // Current chat identifier
     lastThinkingCheck: 0        // Debounce thinking checks
@@ -1094,6 +1099,11 @@
     if (state.thinkingObserver) {
       state.thinkingObserver.disconnect();
     }
+    // Clear any existing polling interval
+    if (state.thinkingPollInterval) {
+      clearInterval(state.thinkingPollInterval);
+      state.thinkingPollInterval = null;
+    }
     if (!state.currentProvider) return;
 
     // Check initial state
@@ -1135,5 +1145,27 @@
       attributes: true,
       attributeFilter: ['aria-label', 'data-testid']
     });
+
+    // Backup polling mechanism - MutationObserver may miss some changes
+    // Poll every 2 seconds to ensure queue gets processed
+    state.thinkingPollInterval = setInterval(() => {
+      const wasThinking = state.isAiThinking;
+      state.isAiThinking = state.currentProvider.isThinking();
+      
+      // If AI finished thinking and we have pending messages, process queue
+      if (wasThinking && !state.isAiThinking && !state.queueProcessing) {
+        updateQueueStatus();
+        setTimeout(() => {
+          if (!state.isAiThinking && !state.queueProcessing) {
+            processQueue();
+          }
+        }, 500);
+      } else if (!state.isAiThinking && !state.queueProcessing && 
+                 state.messageQueue.some(m => m.status === 'pending')) {
+        // Also try to process if we have pending messages and AI is not thinking
+        updateQueueStatus();
+        processQueue();
+      }
+    }, 2000);
   }
 })();
