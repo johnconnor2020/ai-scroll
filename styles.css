@@ -636,3 +636,168 @@
 .scroll-queue-sent .scroll-queue-item-status {
   color: #22c55e;
 }
+
+/* --------------------------------------------------------- */
+/* 9. Pin Feature                                            */
+/* --------------------------------------------------------- */
+.scroll-nav-pin-btn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.15s ease;
+  margin-left: 4px;
+}
+
+.scroll-nav-item:hover .scroll-nav-pin-btn {
+  opacity: 0.6;
+}
+
+.scroll-nav-pin-btn:hover {
+  opacity: 1 !important;
+  color: var(--theme-accent);
+  background: var(--surface-hover);
+}
+
+.scroll-nav-pin-btn.is-pinned {
+  opacity: 1;
+  color: var(--theme-accent);
+}
+
+.scroll-nav-item.is-pinned {
+  background: var(--surface-hover);
+  border-left-color: var(--theme-accent);
+}
+
+.scroll-pinned-list .scroll-nav-item {
+  border-left-color: var(--theme-accent);
+}
+
+/* --------------------------------------------------------- */
+/* 10. Bookmarks Feature                                     */
+/* --------------------------------------------------------- */
+.scroll-bookmarks-section {
+  display: none;
+  border-bottom: 1px solid var(--border-glass);
+  padding: 8px 16px;
+  flex-shrink: 0;
+}
+
+.scroll-bookmarks-section.has-items {
+  display: block;
+}
+
+.scroll-bookmarks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.scroll-bookmarks-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.scroll-bookmark-add-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-hover);
+  border: none;
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scroll-bookmark-add-btn:hover {
+  background: var(--theme-accent);
+  color: white;
+}
+
+.scroll-bookmarks-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.scroll-bookmark-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin-bottom: 2px;
+  background: var(--surface-hover);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scroll-bookmark-item:hover {
+  background: var(--surface-active);
+}
+
+.scroll-bookmark-item:last-child {
+  margin-bottom: 0;
+}
+
+.scroll-bookmark-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--theme-accent);
+}
+
+.scroll-bookmark-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.scroll-bookmark-delete {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.scroll-bookmark-item:hover .scroll-bookmark-delete {
+  opacity: 1;
+}
+
+.scroll-bookmark-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}

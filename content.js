@@ -178,11 +178,16 @@
     thinkingObserver: null,     // MutationObserver for button state
     queueProcessing: false,     // Prevent concurrent processing
     currentChatId: null,        // Current chat identifier
-    lastThinkingCheck: 0        // Debounce thinking checks
+    lastThinkingCheck: 0,       // Debounce thinking checks
+    // Pin & Bookmark feature state
+    pinnedMessages: [],         // Array of { turnIndex, text, timestamp }
+    bookmarks: []               // Array of { id, name, turnIndex, timestamp }
   };
 
   // Storage key prefix for queues
   const QUEUE_STORAGE_KEY = 'scroll-nav-queues';
+  const PINS_STORAGE_KEY = 'scroll-nav-pins';
+  const BOOKMARKS_STORAGE_KEY = 'scroll-nav-bookmarks';
 
   // --- Initialization ---
   if (document.readyState === 'loading') {
@@ -211,6 +216,7 @@
     // Start queue feature
     updateChatId();
     loadQueueForCurrentChat();
+    loadPinsAndBookmarks();
     startThinkingObserver();
 
     // Watch for URL changes (chat switches)
@@ -242,6 +248,7 @@
         <div class="scroll-view-toggle">
              <button class="scroll-view-btn" data-level="1">Prompts</button>
              <button class="scroll-view-btn active" data-level="2">All</button>
+             <button class="scroll-view-btn" data-level="3" title="Show pinned items">★</button>
         </div>
       </div>
 
@@ -250,6 +257,16 @@
             <svg class="scroll-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input type="text" class="scroll-search-input" placeholder="Filter..." id="scroll-search-input">
         </div>
+      </div>
+
+      <div class="scroll-bookmarks-section" id="scroll-bookmarks-section">
+        <div class="scroll-bookmarks-header">
+          <span class="scroll-bookmarks-title">Bookmarks</span>
+          <button class="scroll-bookmark-add-btn" id="scroll-bookmark-add-btn" title="Add bookmark at current position">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+        </div>
+        <ul class="scroll-bookmarks-list" id="scroll-bookmarks-list"></ul>
       </div>
 
       <div class="scroll-nav-content" id="scroll-content"></div>
@@ -299,6 +316,12 @@
             const level = parseInt(btn.dataset.level);
             setViewLevel(level);
         });
+    });
+
+    // Bookmark Listeners
+    const bookmarkAddBtn = root.querySelector('#scroll-bookmark-add-btn');
+    bookmarkAddBtn.addEventListener('click', () => {
+      addBookmarkAtCurrentPosition();
     });
 
     // Queue Listeners
@@ -418,6 +441,12 @@
     const contentEl = document.getElementById('scroll-content');
     if (!contentEl || !state.currentProvider || !state.scrollContainer) return;
 
+    // Handle pinned view (level 3)
+    if (state.viewLevel === 3) {
+      renderPinnedView(contentEl);
+      return;
+    }
+
     let turns = state.currentProvider.getTurns(state.scrollContainer);
     updateScrollTargetFromTurns(turns);
     
@@ -451,6 +480,10 @@
       li.className = 'scroll-nav-item';
       if (!isUser) li.classList.add('is-assistant');
 
+      // Check if this item is pinned
+      const isPinned = state.pinnedMessages.some(p => p.turnIndex === index);
+      if (isPinned) li.classList.add('is-pinned');
+
       // 1. Icon Logic
       const userIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
       const aiIcon   = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line></svg>`;
@@ -472,7 +505,18 @@
           displayText = "..." + rawText.substring(start, end) + "...";
       }
       textSpan.textContent = displayText;
-      li.appendChild(textSpan);   
+      li.appendChild(textSpan);
+
+      // 2.5 Pin Button
+      const pinBtn = document.createElement('button');
+      pinBtn.className = 'scroll-nav-pin-btn' + (isPinned ? ' is-pinned' : '');
+      pinBtn.title = isPinned ? 'Unpin message' : 'Pin message';
+      pinBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+      pinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePin(index, turn.text);
+      });
+      li.appendChild(pinBtn);
 
       // 3. Wiring
       const targetId = `nav-target-${index}`;
@@ -898,13 +942,15 @@
     updateChatId();
     // Load queue for new chat
     loadQueueForCurrentChat();
+    // Load pins and bookmarks for new chat
+    loadPinsAndBookmarks();
     // Reset thinking state
     state.isAiThinking = state.currentProvider ? state.currentProvider.isThinking() : false;
     updateQueueStatus();
   }
 
   function addToQueue(text) {
-    const id = `queue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const id = `queue-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     state.messageQueue.push({ id, text, status: 'pending' });
     saveQueueForChat();
     renderQueue();
@@ -1102,6 +1148,235 @@
       subtree: true,
       attributes: true,
       attributeFilter: ['aria-label', 'data-testid']
+    });
+  }
+
+  // --- Pin & Bookmark Feature Functions ---
+
+  function loadPinsAndBookmarks() {
+    if (!state.currentChatId) return;
+    try {
+      // Load pins
+      const pinsKey = `${PINS_STORAGE_KEY}-${state.currentChatId}`;
+      const savedPins = localStorage.getItem(pinsKey);
+      state.pinnedMessages = savedPins ? JSON.parse(savedPins) : [];
+
+      // Load bookmarks
+      const bookmarksKey = `${BOOKMARKS_STORAGE_KEY}-${state.currentChatId}`;
+      const savedBookmarks = localStorage.getItem(bookmarksKey);
+      state.bookmarks = savedBookmarks ? JSON.parse(savedBookmarks) : [];
+
+      renderBookmarks();
+    } catch (e) {
+      console.warn('Failed to load pins/bookmarks:', e);
+      state.pinnedMessages = [];
+      state.bookmarks = [];
+    }
+  }
+
+  function savePins() {
+    if (!state.currentChatId) return;
+    try {
+      const key = `${PINS_STORAGE_KEY}-${state.currentChatId}`;
+      localStorage.setItem(key, JSON.stringify(state.pinnedMessages));
+    } catch (e) {
+      console.warn('Failed to save pins:', e);
+    }
+  }
+
+  function saveBookmarks() {
+    if (!state.currentChatId) return;
+    try {
+      const key = `${BOOKMARKS_STORAGE_KEY}-${state.currentChatId}`;
+      localStorage.setItem(key, JSON.stringify(state.bookmarks));
+    } catch (e) {
+      console.warn('Failed to save bookmarks:', e);
+    }
+  }
+
+  function togglePin(turnIndex, text) {
+    const existingIndex = state.pinnedMessages.findIndex(p => p.turnIndex === turnIndex);
+    
+    if (existingIndex >= 0) {
+      // Unpin
+      state.pinnedMessages.splice(existingIndex, 1);
+    } else {
+      // Pin
+      state.pinnedMessages.push({
+        turnIndex,
+        text: text.substring(0, 100),
+        timestamp: Date.now()
+      });
+    }
+    
+    savePins();
+    refreshNavigation();
+  }
+
+  function renderPinnedView(contentEl) {
+    state.navTargets.clear();
+    state.navItems.clear();
+    const focusOrder = [];
+
+    const list = document.createElement('ul');
+    list.className = 'scroll-nav-list scroll-pinned-list';
+
+    if (state.pinnedMessages.length === 0) {
+      contentEl.innerHTML = `<div class="scroll-nav-empty-state">No pinned messages yet.<br><small>Click ★ on any message to pin it.</small></div>`;
+      state.focusableIds = [];
+      return;
+    }
+
+    // Get current turns to find elements
+    const turns = state.currentProvider.getTurns(state.scrollContainer);
+    turns.sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1);
+
+    state.pinnedMessages.forEach((pin, pinIndex) => {
+      const turn = turns[pin.turnIndex];
+      if (!turn) return;
+
+      const li = document.createElement('li');
+      li.className = 'scroll-nav-item is-pinned';
+
+      // Icon
+      const isUser = turn.role === 'user';
+      const userIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+      const aiIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line></svg>`;
+      
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'scroll-nav-icon';
+      iconSpan.innerHTML = isUser ? userIcon : aiIcon;
+      li.appendChild(iconSpan);
+
+      // Text
+      const textSpan = document.createElement('span');
+      textSpan.className = 'scroll-nav-text';
+      textSpan.textContent = cleanText(turn.text);
+      li.appendChild(textSpan);
+
+      // Unpin button
+      const unpinBtn = document.createElement('button');
+      unpinBtn.className = 'scroll-nav-pin-btn is-pinned';
+      unpinBtn.title = 'Unpin message';
+      unpinBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
+      unpinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePin(pin.turnIndex, turn.text);
+      });
+      li.appendChild(unpinBtn);
+
+      // Wiring
+      const targetId = `pinned-${pinIndex}`;
+      state.navTargets.set(targetId, turn.element);
+      state.navItems.set(targetId, li);
+      focusOrder.push(targetId);
+
+      li.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scrollToElement(turn.element, targetId);
+      });
+
+      list.appendChild(li);
+    });
+
+    contentEl.innerHTML = '';
+    contentEl.appendChild(list);
+
+    state.focusableIds = focusOrder;
+    if (state.focusedIndex >= focusOrder.length) {
+      state.focusedIndex = focusOrder.length - 1;
+    }
+    updateFocusVisuals();
+  }
+
+  function addBookmarkAtCurrentPosition() {
+    // Find the currently active/visible turn
+    const activeId = state.activeNavId;
+    let turnIndex = 0;
+    
+    if (activeId) {
+      const match = activeId.match(/nav-target-(\d+)/);
+      if (match) {
+        turnIndex = parseInt(match[1]);
+      }
+    }
+
+    // Prompt for bookmark name
+    const name = prompt('Enter a name for this bookmark:', `Bookmark ${state.bookmarks.length + 1}`);
+    if (!name) return;
+
+    const id = `bookmark-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    state.bookmarks.push({
+      id,
+      name,
+      turnIndex,
+      timestamp: Date.now()
+    });
+
+    saveBookmarks();
+    renderBookmarks();
+  }
+
+  function removeBookmark(id) {
+    state.bookmarks = state.bookmarks.filter(b => b.id !== id);
+    saveBookmarks();
+    renderBookmarks();
+  }
+
+  function renderBookmarks() {
+    const list = document.getElementById('scroll-bookmarks-list');
+    const section = document.getElementById('scroll-bookmarks-section');
+    if (!list || !section) return;
+
+    list.innerHTML = '';
+
+    if (state.bookmarks.length === 0) {
+      section.classList.remove('has-items');
+      return;
+    }
+
+    section.classList.add('has-items');
+
+    // Get current turns to find elements
+    const turns = state.currentProvider ? state.currentProvider.getTurns(state.scrollContainer) : [];
+    turns.sort((a, b) => (a.element && b.element && (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING)) ? -1 : 1);
+
+    state.bookmarks.forEach(bookmark => {
+      const li = document.createElement('li');
+      li.className = 'scroll-bookmark-item';
+      li.dataset.id = bookmark.id;
+
+      // Bookmark icon
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'scroll-bookmark-icon';
+      iconSpan.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>`;
+      li.appendChild(iconSpan);
+
+      // Name
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'scroll-bookmark-name';
+      nameSpan.textContent = bookmark.name;
+      li.appendChild(nameSpan);
+
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'scroll-bookmark-delete';
+      deleteBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeBookmark(bookmark.id);
+      });
+      li.appendChild(deleteBtn);
+
+      // Click to navigate
+      li.addEventListener('click', () => {
+        const turn = turns[bookmark.turnIndex];
+        if (turn && turn.element) {
+          scrollToElement(turn.element, `bookmark-nav-${bookmark.id}`);
+        }
+      });
+
+      list.appendChild(li);
     });
   }
 })();
