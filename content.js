@@ -67,18 +67,42 @@
       isMatch: () => window.location.hostname.includes('chatgpt') || window.location.hostname.includes('openai'),
       scrollContainerSelector: 'main div[class*="overflow-y-auto"]',
       // Queue feature selectors
-      inputSelector: '#prompt-textarea',
+      inputSelector: '#prompt-textarea, [contenteditable="true"][data-placeholder]',
       sendButtonSelector: 'button[data-testid="send-button"], button[data-testid="stop-button"]',
       isThinking: () => {
+        // Check for stop button (primary indicator)
         const stopBtn = document.querySelector('button[data-testid="stop-button"]');
-        return stopBtn !== null;
+        if (stopBtn) return true;
+        // Also check for streaming indicator or loading states
+        const streamingIndicator = document.querySelector('[data-testid="stop-button"], .result-streaming, [class*="streaming"]');
+        return streamingIndicator !== null;
       },
-      getInputElement: () => document.querySelector('#prompt-textarea'),
+      getInputElement: () => {
+        // ChatGPT may use different input elements depending on UI version
+        // Try #prompt-textarea first (may be a div or textarea)
+        const promptTextarea = document.querySelector('#prompt-textarea');
+        if (promptTextarea) return promptTextarea;
+        // Fallback: look for contenteditable with placeholder attribute (common pattern)
+        return document.querySelector('[contenteditable="true"][data-placeholder]');
+      },
       getSendButton: () => document.querySelector('button[data-testid="send-button"]'),
       setInputValue: (el, text) => {
         el.focus();
-        el.value = text;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
+        // ChatGPT uses contenteditable for the input (a <p> or <div> element)
+        // Note: execCommand is deprecated but still works well for contenteditable
+        // and matches the pattern used by the Claude provider
+        if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') {
+          // Clear existing content
+          el.innerHTML = '';
+          // Use execCommand which triggers ChatGPT's internal handlers
+          document.execCommand('insertText', false, text);
+          // Also dispatch input event to ensure React picks up the change
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
+        } else {
+          // Fallback for regular input/textarea
+          el.value = text;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       },
       getTurns: (container) => {
         const articles = Array.from(container.querySelectorAll('article[data-turn]'));
@@ -176,6 +200,7 @@
     isAiThinking: false,        // Is AI currently generating?
     queueEnabled: true,         // Feature toggle
     thinkingObserver: null,     // MutationObserver for button state
+    thinkingPollInterval: null, // Backup polling interval for thinking state
     queueProcessing: false,     // Prevent concurrent processing
     currentChatId: null,        // Current chat identifier
     lastThinkingCheck: 0        // Debounce thinking checks
@@ -1048,19 +1073,36 @@
       if (sendBtnNow) {
         sendBtnNow.click();
 
-        // Remove from queue immediately after sending
+        // Remove from queue after clicking send
         state.messageQueue = state.messageQueue.filter(m => m.id !== msg.id);
         saveQueueForChat();
         renderQueue();
         updateQueueStatus();
+
+        // Wait a bit for ChatGPT to start processing before releasing the lock
+        // This prevents race conditions where the next message tries to send
+        // before ChatGPT has started "thinking" (1000ms allows UI to update)
+        setTimeout(() => {
+          state.queueProcessing = false;
+          // If AI didn't start thinking (empty input or other issue), try to continue queue
+          if (!state.isAiThinking && state.messageQueue.some(m => m.status === 'pending')) {
+            processQueue();
+          }
+        }, 1000);
+      } else {
+        state.queueProcessing = false;
       }
-      state.queueProcessing = false;
     }, 300);
   }
 
   function startThinkingObserver() {
     if (state.thinkingObserver) {
       state.thinkingObserver.disconnect();
+    }
+    // Clear any existing polling interval
+    if (state.thinkingPollInterval) {
+      clearInterval(state.thinkingPollInterval);
+      state.thinkingPollInterval = null;
     }
     if (!state.currentProvider) return;
 
@@ -1103,5 +1145,27 @@
       attributes: true,
       attributeFilter: ['aria-label', 'data-testid']
     });
+
+    // Backup polling mechanism - MutationObserver may miss some changes
+    // Poll every 2 seconds to ensure queue gets processed
+    state.thinkingPollInterval = setInterval(() => {
+      const wasThinking = state.isAiThinking;
+      state.isAiThinking = state.currentProvider.isThinking();
+      
+      // If AI finished thinking and we have pending messages, process queue
+      if (wasThinking && !state.isAiThinking && !state.queueProcessing) {
+        updateQueueStatus();
+        setTimeout(() => {
+          if (!state.isAiThinking && !state.queueProcessing) {
+            processQueue();
+          }
+        }, 500);
+      } else if (!state.isAiThinking && !state.queueProcessing && 
+                 state.messageQueue.some(m => m.status === 'pending')) {
+        // Also try to process if we have pending messages and AI is not thinking
+        updateQueueStatus();
+        processQueue();
+      }
+    }, 2000);
   }
 })();
