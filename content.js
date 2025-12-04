@@ -7,6 +7,21 @@
     claude: {
       isMatch: () => window.location.hostname.includes('claude'),
       scrollContainerSelector: 'main div[class*="overflow-y-auto"]',
+      // Queue feature selectors
+      inputSelector: '[contenteditable="true"]',
+      sendButtonSelector: 'button[aria-label="Send Message"], button[aria-label="Stop Response"]',
+      isThinking: () => {
+        const stopBtn = document.querySelector('button[aria-label="Stop Response"]');
+        return stopBtn !== null;
+      },
+      getInputElement: () => document.querySelector('[contenteditable="true"]'),
+      getSendButton: () => document.querySelector('button[aria-label="Send Message"]'),
+      setInputValue: (el, text) => {
+        el.focus();
+        el.innerHTML = '';
+        document.execCommand('insertText', false, text);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      },
       getTurns: (container) => {
         const turns = [];
         const assistantSelectors = [
@@ -51,6 +66,20 @@
     chatgpt: {
       isMatch: () => window.location.hostname.includes('chatgpt') || window.location.hostname.includes('openai'),
       scrollContainerSelector: 'main div[class*="overflow-y-auto"]',
+      // Queue feature selectors
+      inputSelector: '#prompt-textarea',
+      sendButtonSelector: 'button[data-testid="send-button"], button[data-testid="stop-button"]',
+      isThinking: () => {
+        const stopBtn = document.querySelector('button[data-testid="stop-button"]');
+        return stopBtn !== null;
+      },
+      getInputElement: () => document.querySelector('#prompt-textarea'),
+      getSendButton: () => document.querySelector('button[data-testid="send-button"]'),
+      setInputValue: (el, text) => {
+        el.focus();
+        el.value = text;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      },
       getTurns: (container) => {
         const articles = Array.from(container.querySelectorAll('article[data-turn]'));
         return articles.map(article => {
@@ -77,6 +106,20 @@
     gemini: {
       isMatch: () => window.location.hostname.includes('gemini') || window.location.hostname.includes('google'),
       scrollContainerSelector: '.mat-sidenav-content',
+      // Queue feature selectors
+      inputSelector: '.ql-editor, [contenteditable="true"]',
+      sendButtonSelector: 'button[aria-label="Send message"], button[aria-label="Stop generating"]',
+      isThinking: () => {
+        const stopBtn = document.querySelector('button[aria-label="Stop generating"]');
+        return stopBtn !== null;
+      },
+      getInputElement: () => document.querySelector('.ql-editor, [contenteditable="true"]'),
+      getSendButton: () => document.querySelector('button[aria-label="Send message"]'),
+      setInputValue: (el, text) => {
+        el.focus();
+        el.innerHTML = text;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      },
       getTurns: (container) => {
         const turns = [];
         const items = Array.from(container.querySelectorAll('user-query, model-response'));
@@ -114,7 +157,7 @@
   const state = {
     isOpen: false,
     currentProvider: null,
-    searchTerm: '', 
+    searchTerm: '',
     viewLevel: 2, // 1 = Prompts Only, 2 = All
     navTargets: new Map(),
     navItems: new Map(),
@@ -127,7 +170,13 @@
     conversationObserver: null,
     bodyObserver: null,
     suppressNavAutoScroll: false,
-    navAutoScrollTimeout: null
+    navAutoScrollTimeout: null,
+    // Queue feature state
+    messageQueue: [],           // Array of { id, text, status: 'pending'|'sending'|'sent' }
+    isAiThinking: false,        // Is AI currently generating?
+    queueEnabled: true,         // Feature toggle
+    thinkingObserver: null,     // MutationObserver for button state
+    queueProcessing: false      // Prevent concurrent processing
   };
 
   // --- Initialization ---
@@ -148,11 +197,14 @@
     createUI();
     applyTheme();
     observeForContainerChanges();
-    
+
     const container = findConversationContainer();
     if (container) setConversationContainer(container);
-    
+
     refreshNavigation();
+
+    // Start queue feature
+    startThinkingObserver();
   }
 
   // --- UI Creation ---
@@ -176,15 +228,13 @@
     panel.innerHTML = `
       <div class="scroll-nav-header">
         <span class="scroll-nav-progress" id="scroll-progress">0%</span>
-        
+
         <div class="scroll-view-toggle">
              <button class="scroll-view-btn" data-level="1">Prompts</button>
              <button class="scroll-view-btn active" data-level="2">All</button>
         </div>
-        
-    
       </div>
-      
+
       <div class="scroll-search-container">
         <div class="scroll-search-wrapper">
             <svg class="scroll-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -193,6 +243,20 @@
       </div>
 
       <div class="scroll-nav-content" id="scroll-content"></div>
+
+      <div class="scroll-queue-section" id="scroll-queue-section">
+        <div class="scroll-queue-header">
+          <span class="scroll-queue-title">Message Queue</span>
+          <span class="scroll-queue-status" id="scroll-queue-status"></span>
+        </div>
+        <div class="scroll-queue-input-wrapper">
+          <textarea class="scroll-queue-input" id="scroll-queue-input" placeholder="Type a follow-up message..." rows="2"></textarea>
+          <button class="scroll-queue-add-btn" id="scroll-queue-add-btn" title="Add to queue (Ctrl+Shift+Enter)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+        </div>
+        <ul class="scroll-queue-list" id="scroll-queue-list"></ul>
+      </div>
     `;
 
     root.appendChild(toggleBtn);
@@ -225,6 +289,32 @@
             const level = parseInt(btn.dataset.level);
             setViewLevel(level);
         });
+    });
+
+    // Queue Listeners
+    const queueInput = root.querySelector('#scroll-queue-input');
+    const queueAddBtn = root.querySelector('#scroll-queue-add-btn');
+
+    queueAddBtn.addEventListener('click', () => {
+      const text = queueInput.value.trim();
+      if (text) {
+        addToQueue(text);
+        queueInput.value = '';
+      }
+    });
+
+    queueInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      // Ctrl+Shift+Enter or Cmd+Shift+Enter to queue
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') {
+        e.preventDefault();
+        const text = queueInput.value.trim();
+        if (text) {
+          addToQueue(text);
+          queueInput.value = '';
+        }
+      }
+      // Regular Enter just adds newline (default behavior)
     });
 
     // Keyboard Shortcuts (Cmd + . or Cmd + ;)
@@ -695,5 +785,190 @@
       clearTimeout(t);
       t = setTimeout(() => fn.apply(this, args), ms);
     }
+  }
+
+  // --- Queue Feature Functions ---
+
+  function addToQueue(text) {
+    const id = `queue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    state.messageQueue.push({ id, text, status: 'pending' });
+    renderQueue();
+    updateQueueStatus();
+    // If AI is not thinking, process immediately
+    if (!state.isAiThinking && !state.queueProcessing) {
+      processQueue();
+    }
+  }
+
+  function removeFromQueue(id) {
+    state.messageQueue = state.messageQueue.filter(m => m.id !== id);
+    renderQueue();
+    updateQueueStatus();
+  }
+
+  function renderQueue() {
+    const list = document.getElementById('scroll-queue-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+
+    state.messageQueue.forEach((msg, index) => {
+      const li = document.createElement('li');
+      li.className = `scroll-queue-item scroll-queue-${msg.status}`;
+      li.dataset.id = msg.id;
+
+      // Status icon
+      const statusIcon = document.createElement('span');
+      statusIcon.className = 'scroll-queue-item-status';
+      if (msg.status === 'pending') {
+        statusIcon.innerHTML = `<span class="scroll-queue-number">${index + 1}</span>`;
+      } else if (msg.status === 'sending') {
+        statusIcon.innerHTML = `<svg class="scroll-queue-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`;
+      } else {
+        statusIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      }
+      li.appendChild(statusIcon);
+
+      // Text
+      const textSpan = document.createElement('span');
+      textSpan.className = 'scroll-queue-item-text';
+      textSpan.textContent = msg.text.length > 60 ? msg.text.substring(0, 58) + '...' : msg.text;
+      textSpan.title = msg.text;
+      li.appendChild(textSpan);
+
+      // Delete button (only for pending)
+      if (msg.status === 'pending') {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'scroll-queue-item-delete';
+        deleteBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeFromQueue(msg.id);
+        });
+        li.appendChild(deleteBtn);
+      }
+
+      list.appendChild(li);
+    });
+
+    // Show/hide queue section based on content
+    const section = document.getElementById('scroll-queue-section');
+    if (section) {
+      section.classList.toggle('has-items', state.messageQueue.length > 0);
+    }
+  }
+
+  function updateQueueStatus() {
+    const statusEl = document.getElementById('scroll-queue-status');
+    if (!statusEl) return;
+
+    const pending = state.messageQueue.filter(m => m.status === 'pending').length;
+
+    if (state.isAiThinking) {
+      statusEl.innerHTML = `<span class="scroll-thinking-dot"></span> AI thinking...`;
+      statusEl.className = 'scroll-queue-status thinking';
+    } else if (pending > 0) {
+      statusEl.textContent = `${pending} queued`;
+      statusEl.className = 'scroll-queue-status';
+    } else {
+      statusEl.textContent = '';
+      statusEl.className = 'scroll-queue-status';
+    }
+  }
+
+  function processQueue() {
+    if (state.queueProcessing) return;
+    if (state.isAiThinking) return;
+    if (!state.currentProvider) return;
+
+    const nextMsg = state.messageQueue.find(m => m.status === 'pending');
+    if (!nextMsg) return;
+
+    state.queueProcessing = true;
+    nextMsg.status = 'sending';
+    renderQueue();
+
+    // Small delay to ensure UI is ready
+    setTimeout(() => {
+      sendQueuedMessage(nextMsg);
+    }, 500);
+  }
+
+  function sendQueuedMessage(msg) {
+    const provider = state.currentProvider;
+    if (!provider) {
+      state.queueProcessing = false;
+      return;
+    }
+
+    const inputEl = provider.getInputElement();
+    const sendBtn = provider.getSendButton();
+
+    if (!inputEl || !sendBtn) {
+      // Can't find elements, retry later
+      setTimeout(() => {
+        state.queueProcessing = false;
+        processQueue();
+      }, 1000);
+      return;
+    }
+
+    // Set the input value
+    provider.setInputValue(inputEl, msg.text);
+
+    // Wait for input to register, then click send
+    setTimeout(() => {
+      const sendBtnNow = provider.getSendButton();
+      if (sendBtnNow) {
+        sendBtnNow.click();
+        msg.status = 'sent';
+        renderQueue();
+
+        // Remove sent message after a short delay
+        setTimeout(() => {
+          state.messageQueue = state.messageQueue.filter(m => m.id !== msg.id);
+          renderQueue();
+          updateQueueStatus();
+        }, 2000);
+      }
+      state.queueProcessing = false;
+    }, 200);
+  }
+
+  function startThinkingObserver() {
+    if (state.thinkingObserver) return;
+    if (!state.currentProvider) return;
+
+    // Check initial state
+    state.isAiThinking = state.currentProvider.isThinking();
+    updateQueueStatus();
+
+    // Create observer to watch for button changes
+    state.thinkingObserver = new MutationObserver(() => {
+      const wasThinking = state.isAiThinking;
+      state.isAiThinking = state.currentProvider.isThinking();
+
+      if (wasThinking !== state.isAiThinking) {
+        updateQueueStatus();
+
+        // AI just finished thinking - process queue
+        if (wasThinking && !state.isAiThinking) {
+          // Wait a moment for the UI to settle
+          setTimeout(() => {
+            if (!state.isAiThinking) {
+              processQueue();
+            }
+          }, 1000);
+        }
+      }
+    });
+
+    // Observe the whole body for button changes
+    state.thinkingObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-label', 'data-testid']
+    });
   }
 })();
