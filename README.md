@@ -40,6 +40,9 @@ AI chat interfaces weren't designed for long conversations. Finding a specific p
 - **One-Click Navigation:** Jump to any turn in the conversation instantly.
 - **Heading Support:** Automatically detects headings (`#`, `##`) inside long AI responses.
 - **Search & Filter:** Type to find that one specific code snippet or idea.
+- **Pin Favorite Responses:** Star important messages for quick access with the ★ view.
+- **Conversation Bookmarks:** Add named bookmarks to quickly return to key points in the conversation.
+- **Message Queue:** Queue up follow-up messages to be sent automatically when the AI finishes responding.
 - **Privacy Focused:** Runs 100% locally. No data leaves your browser.
 - **Keyboard Shortcuts:** Keep your hands on the keyboard (`Cmd/Ctrl + .` to toggle).
 
@@ -80,10 +83,11 @@ If you want the latest version immediately, you can install it manually.
   - [x] Basic navigation & Search
   - [x] Heading navigation (Markdown support)
   - [x] Firefox support (Manifest V3)
-  - [ ] Pin favorite responses
+  - [x] Pin favorite responses
+  - [x] Conversation bookmarks
+  - [x] Message queue
   - [ ] Export conversations
   - [ ] Custom themes
-  - [ ] Conversation bookmarks
 
 ## 🔒 Privacy
 
