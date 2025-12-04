@@ -67,27 +67,38 @@
       isMatch: () => window.location.hostname.includes('chatgpt') || window.location.hostname.includes('openai'),
       scrollContainerSelector: 'main div[class*="overflow-y-auto"]',
       // Queue feature selectors
-      inputSelector: '#prompt-textarea',
+      inputSelector: '#prompt-textarea, [contenteditable="true"][data-placeholder]',
       sendButtonSelector: 'button[data-testid="send-button"], button[data-testid="stop-button"]',
       isThinking: () => {
         const stopBtn = document.querySelector('button[data-testid="stop-button"]');
         return stopBtn !== null;
       },
-      getInputElement: () => document.querySelector('#prompt-textarea'),
+      getInputElement: () => {
+        // ChatGPT may use different input elements depending on UI version
+        // Try #prompt-textarea first (may be a div or textarea)
+        const promptTextarea = document.querySelector('#prompt-textarea');
+        if (promptTextarea) return promptTextarea;
+        // Fallback: look for contenteditable with placeholder attribute (common pattern)
+        return document.querySelector('[contenteditable="true"][data-placeholder]');
+      },
       getSendButton: () => document.querySelector('button[data-testid="send-button"]'),
       setInputValue: (el, text) => {
         el.focus();
-        // ChatGPT uses contenteditable for the input, not a regular textarea
+        // ChatGPT uses contenteditable for the input (a <p> or <div> element)
         // Note: execCommand is deprecated but still works well for contenteditable
         // and matches the pattern used by the Claude provider
-        if (el.isContentEditable) {
+        if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') {
+          // Clear existing content
           el.innerHTML = '';
+          // Use execCommand which triggers ChatGPT's internal handlers
           document.execCommand('insertText', false, text);
+          // Also dispatch input event to ensure React picks up the change
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, data: text }));
         } else {
           // Fallback for regular input/textarea
           el.value = text;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        el.dispatchEvent(new Event('input', { bubbles: true }));
       },
       getTurns: (container) => {
         const articles = Array.from(container.querySelectorAll('article[data-turn]'));
