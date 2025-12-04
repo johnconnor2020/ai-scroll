@@ -950,7 +950,7 @@
   }
 
   function addToQueue(text) {
-    const id = `queue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const id = `queue-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     state.messageQueue.push({ id, text, status: 'pending' });
     saveQueueForChat();
     renderQueue();
@@ -1305,7 +1305,7 @@
     const name = prompt('Enter a name for this bookmark:', `Bookmark ${state.bookmarks.length + 1}`);
     if (!name) return;
 
-    const id = `bookmark-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const id = `bookmark-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     state.bookmarks.push({
       id,
       name,

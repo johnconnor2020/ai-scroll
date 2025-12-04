@@ -673,7 +673,8 @@
 }
 
 .scroll-nav-item.is-pinned {
-  background: linear-gradient(90deg, transparent 0%, rgba(var(--theme-accent-rgb, 218, 119, 86), 0.05) 100%);
+  background: var(--surface-hover);
+  border-left-color: var(--theme-accent);
 }
 
 .scroll-pinned-list .scroll-nav-item {
