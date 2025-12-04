@@ -1053,9 +1053,67 @@
         saveQueueForChat();
         renderQueue();
         updateQueueStatus();
+
+        // Wait for AI to start thinking, then wait for it to finish
+        // before processing the next message
+        waitForAiToStartAndFinish();
+      } else {
+        state.queueProcessing = false;
       }
-      state.queueProcessing = false;
     }, 300);
+  }
+
+  function waitForAiToStartAndFinish() {
+    let checkCount = 0;
+    const maxChecks = 20; // Max 10 seconds waiting for AI to start
+
+    const checkAiStarted = () => {
+      checkCount++;
+      const isThinking = state.currentProvider.isThinking();
+
+      if (isThinking) {
+        // AI started thinking, now wait for it to finish
+        state.isAiThinking = true;
+        updateQueueStatus();
+        waitForAiToFinish();
+      } else if (checkCount < maxChecks) {
+        // Keep waiting for AI to start
+        setTimeout(checkAiStarted, 500);
+      } else {
+        // Timeout - AI never started, maybe message didn't send
+        // Try processing next message anyway
+        state.queueProcessing = false;
+        processQueue();
+      }
+    };
+
+    // Start checking after a short delay
+    setTimeout(checkAiStarted, 300);
+  }
+
+  function waitForAiToFinish() {
+    const checkAiFinished = () => {
+      const isThinking = state.currentProvider.isThinking();
+
+      if (!isThinking) {
+        // AI finished thinking
+        state.isAiThinking = false;
+        state.queueProcessing = false;
+        updateQueueStatus();
+
+        // Wait a moment then process next message
+        setTimeout(() => {
+          if (!state.isAiThinking && !state.queueProcessing) {
+            processQueue();
+          }
+        }, 1000);
+      } else {
+        // Still thinking, check again
+        setTimeout(checkAiFinished, 500);
+      }
+    };
+
+    checkAiFinished();
   }
 
   function startThinkingObserver() {
