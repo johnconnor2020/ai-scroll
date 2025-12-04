@@ -176,8 +176,13 @@
     isAiThinking: false,        // Is AI currently generating?
     queueEnabled: true,         // Feature toggle
     thinkingObserver: null,     // MutationObserver for button state
-    queueProcessing: false      // Prevent concurrent processing
+    queueProcessing: false,     // Prevent concurrent processing
+    currentChatId: null,        // Current chat identifier
+    lastThinkingCheck: 0        // Debounce thinking checks
   };
+
+  // Storage key prefix for queues
+  const QUEUE_STORAGE_KEY = 'scroll-nav-queues';
 
   // --- Initialization ---
   if (document.readyState === 'loading') {
@@ -204,7 +209,12 @@
     refreshNavigation();
 
     // Start queue feature
+    updateChatId();
+    loadQueueForCurrentChat();
     startThinkingObserver();
+
+    // Watch for URL changes (chat switches)
+    observeUrlChanges();
   }
 
   // --- UI Creation ---
@@ -789,9 +799,114 @@
 
   // --- Queue Feature Functions ---
 
+  // Get a unique identifier for the current chat
+  function getChatId() {
+    const url = window.location.href;
+    const hostname = window.location.hostname;
+
+    // Extract chat/conversation ID from URL
+    let chatId = 'default';
+
+    if (hostname.includes('claude')) {
+      // Claude: https://claude.ai/chat/uuid
+      const match = url.match(/\/chat\/([a-zA-Z0-9-]+)/);
+      chatId = match ? match[1] : 'claude-default';
+    } else if (hostname.includes('chatgpt') || hostname.includes('openai')) {
+      // ChatGPT: https://chatgpt.com/c/uuid
+      const match = url.match(/\/c\/([a-zA-Z0-9-]+)/);
+      chatId = match ? match[1] : 'chatgpt-default';
+    } else if (hostname.includes('gemini') || hostname.includes('google')) {
+      // Gemini: https://gemini.google.com/app/uuid
+      const match = url.match(/\/app\/([a-zA-Z0-9-]+)/);
+      chatId = match ? match[1] : 'gemini-default';
+    }
+
+    // Prefix with hostname to separate queues across sites
+    return `${hostname}:${chatId}`;
+  }
+
+  function updateChatId() {
+    const newChatId = getChatId();
+    if (state.currentChatId !== newChatId) {
+      // Save current queue before switching
+      if (state.currentChatId) {
+        saveQueueForChat(state.currentChatId);
+      }
+      state.currentChatId = newChatId;
+      // Reset processing state when switching chats
+      state.queueProcessing = false;
+      state.isAiThinking = false;
+    }
+  }
+
+  function getStorageKey() {
+    return `${QUEUE_STORAGE_KEY}-${state.currentChatId}`;
+  }
+
+  function saveQueueForChat(chatId = state.currentChatId) {
+    if (!chatId) return;
+    try {
+      const key = `${QUEUE_STORAGE_KEY}-${chatId}`;
+      // Only save pending messages
+      const pendingMessages = state.messageQueue.filter(m => m.status === 'pending');
+      localStorage.setItem(key, JSON.stringify(pendingMessages));
+    } catch (e) {
+      console.warn('Failed to save queue:', e);
+    }
+  }
+
+  function loadQueueForCurrentChat() {
+    if (!state.currentChatId) return;
+    try {
+      const key = getStorageKey();
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        state.messageQueue = JSON.parse(saved);
+        // Ensure all loaded messages are pending
+        state.messageQueue.forEach(m => m.status = 'pending');
+      } else {
+        state.messageQueue = [];
+      }
+      renderQueue();
+      updateQueueStatus();
+    } catch (e) {
+      console.warn('Failed to load queue:', e);
+      state.messageQueue = [];
+    }
+  }
+
+  function observeUrlChanges() {
+    let lastUrl = window.location.href;
+
+    // Check URL periodically for changes
+    setInterval(() => {
+      const currentUrl = window.location.href;
+      if (currentUrl !== lastUrl) {
+        lastUrl = currentUrl;
+        onChatChanged();
+      }
+    }, 500);
+
+    // Also listen for popstate (back/forward navigation)
+    window.addEventListener('popstate', onChatChanged);
+  }
+
+  function onChatChanged() {
+    // Save current queue
+    saveQueueForChat();
+    // Update chat ID
+    updateChatId();
+    // Load queue for new chat
+    loadQueueForCurrentChat();
+    // Reset thinking state
+    state.isAiThinking = state.currentProvider ? state.currentProvider.isThinking() : false;
+    updateQueueStatus();
+  }
+
   function addToQueue(text) {
     const id = `queue-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     state.messageQueue.push({ id, text, status: 'pending' });
+    saveQueueForChat();
     renderQueue();
     updateQueueStatus();
     // If AI is not thinking, process immediately
@@ -802,6 +917,7 @@
 
   function removeFromQueue(id) {
     state.messageQueue = state.messageQueue.filter(m => m.id !== id);
+    saveQueueForChat();
     renderQueue();
     updateQueueStatus();
   }
@@ -812,7 +928,10 @@
 
     list.innerHTML = '';
 
-    state.messageQueue.forEach((msg, index) => {
+    // Only show pending and sending messages
+    const visibleMessages = state.messageQueue.filter(m => m.status !== 'sent');
+
+    visibleMessages.forEach((msg, index) => {
       const li = document.createElement('li');
       li.className = `scroll-queue-item scroll-queue-${msg.status}`;
       li.dataset.id = msg.id;
@@ -824,8 +943,6 @@
         statusIcon.innerHTML = `<span class="scroll-queue-number">${index + 1}</span>`;
       } else if (msg.status === 'sending') {
         statusIcon.innerHTML = `<svg class="scroll-queue-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`;
-      } else {
-        statusIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
       }
       li.appendChild(statusIcon);
 
@@ -854,7 +971,7 @@
     // Show/hide queue section based on content
     const section = document.getElementById('scroll-queue-section');
     if (section) {
-      section.classList.toggle('has-items', state.messageQueue.length > 0);
+      section.classList.toggle('has-items', visibleMessages.length > 0);
     }
   }
 
@@ -905,11 +1022,20 @@
     const sendBtn = provider.getSendButton();
 
     if (!inputEl || !sendBtn) {
-      // Can't find elements, retry later
-      setTimeout(() => {
+      // Can't find elements, retry later (max 3 times)
+      msg.retryCount = (msg.retryCount || 0) + 1;
+      if (msg.retryCount < 3) {
+        setTimeout(() => {
+          state.queueProcessing = false;
+          processQueue();
+        }, 1000);
+      } else {
+        // Give up, reset to pending
+        msg.status = 'pending';
+        msg.retryCount = 0;
         state.queueProcessing = false;
-        processQueue();
-      }, 1000);
+        renderQueue();
+      }
       return;
     }
 
@@ -921,30 +1047,34 @@
       const sendBtnNow = provider.getSendButton();
       if (sendBtnNow) {
         sendBtnNow.click();
-        msg.status = 'sent';
-        renderQueue();
 
-        // Remove sent message after a short delay
-        setTimeout(() => {
-          state.messageQueue = state.messageQueue.filter(m => m.id !== msg.id);
-          renderQueue();
-          updateQueueStatus();
-        }, 2000);
+        // Remove from queue immediately after sending
+        state.messageQueue = state.messageQueue.filter(m => m.id !== msg.id);
+        saveQueueForChat();
+        renderQueue();
+        updateQueueStatus();
       }
       state.queueProcessing = false;
-    }, 200);
+    }, 300);
   }
 
   function startThinkingObserver() {
-    if (state.thinkingObserver) return;
+    if (state.thinkingObserver) {
+      state.thinkingObserver.disconnect();
+    }
     if (!state.currentProvider) return;
 
     // Check initial state
     state.isAiThinking = state.currentProvider.isThinking();
     updateQueueStatus();
 
-    // Create observer to watch for button changes
-    state.thinkingObserver = new MutationObserver(() => {
+    // Debounced thinking check
+    const checkThinking = () => {
+      const now = Date.now();
+      // Debounce: only check every 300ms
+      if (now - state.lastThinkingCheck < 300) return;
+      state.lastThinkingCheck = now;
+
       const wasThinking = state.isAiThinking;
       state.isAiThinking = state.currentProvider.isThinking();
 
@@ -952,16 +1082,19 @@
         updateQueueStatus();
 
         // AI just finished thinking - process queue
-        if (wasThinking && !state.isAiThinking) {
+        if (wasThinking && !state.isAiThinking && !state.queueProcessing) {
           // Wait a moment for the UI to settle
           setTimeout(() => {
-            if (!state.isAiThinking) {
+            if (!state.isAiThinking && !state.queueProcessing) {
               processQueue();
             }
-          }, 1000);
+          }, 1500);
         }
       }
-    });
+    };
+
+    // Create observer to watch for button changes
+    state.thinkingObserver = new MutationObserver(checkThinking);
 
     // Observe the whole body for button changes
     state.thinkingObserver.observe(document.body, {
